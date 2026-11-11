@@ -1,0 +1,10 @@
+packages/
+**/packages/
+.vs/
+**/.vs/
+bin/
+**/bin/
+obj/
+**/obj/
+*.user
+*.suo
