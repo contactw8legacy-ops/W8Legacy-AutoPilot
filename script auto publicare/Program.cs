@@ -29,11 +29,20 @@ namespace W8LegacyAutopilot
         public string ChannelName { get; set; }
     }
 
+    class ChannelProfile
+    {
+        public string NumeCanal { get; set; }
+        public string NisaSiPersonalitate { get; set; }
+        public string LinkSponsor { get; set; }
+    }
+
     class Program
     {
         static List<string> SubiecteFolosite = new List<string>();
         static string WorkFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "W8_AutoPilot_Output");
         static string IstoricPath = Path.Combine(WorkFolder, "history.json");
+        static string ProfilPath = Path.Combine(WorkFolder, "profil_canal.json");
+        static ChannelProfile ProfilCurent = new ChannelProfile();
 
         static string ApiKey = "";
         static string GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent";
@@ -90,7 +99,7 @@ namespace W8LegacyAutopilot
                     {
                         Environment.SetEnvironmentVariable("GEMINI_API_KEY", ApiKey, EnvironmentVariableTarget.User);
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine("-> Cheia a fost salvată automat în Windows! Nu va mai trebui să o introduci data viitoare.\n");
+                        Console.WriteLine("-> Cheia a fost salvată automat în Windows!\n");
                         Console.ResetColor();
                         Thread.Sleep(1500);
                     }
@@ -99,12 +108,46 @@ namespace W8LegacyAutopilot
             }
         }
 
+        static void AsiguraProfilCanal()
+        {
+            if (File.Exists(ProfilPath))
+            {
+                try
+                {
+                    ProfilCurent = JsonConvert.DeserializeObject<ChannelProfile>(File.ReadAllText(ProfilPath));
+                    return;
+                }
+                catch { }
+            }
+
+            Console.Clear();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("=== CONFIGURARE PROFIL CANAL (PENTRU TITLURI ȘI DESCRIERI UNICE) ===\n");
+            Console.ResetColor();
+
+            Console.Write("1. Care este numele canalului tău? (ex: W8LegacyOfficial): ");
+            ProfilCurent.NumeCanal = Console.ReadLine()?.Trim();
+
+            Console.Write("2. Care este nișa și personalitatea contului? (ex: mecanic auto serios, pasionat de tuning care face caterincă, vlogger de BMW-uri): ");
+            ProfilCurent.NisaSiPersonalitate = Console.ReadLine()?.Trim();
+
+            Console.Write("3. Ce link vrei să promovezi în descrieri? (ex: link de afiliat, Revolut, magazin piese): ");
+            ProfilCurent.LinkSponsor = Console.ReadLine()?.Trim();
+
+            File.WriteAllText(ProfilPath, JsonConvert.SerializeObject(ProfilCurent, Formatting.Indented));
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\nProfil salvat cu succes! Gemini va scrie texte special pentru acest canal.");
+            Console.ResetColor();
+            Thread.Sleep(2000);
+        }
+
         static async Task Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
             if (!Directory.Exists(WorkFolder)) Directory.CreateDirectory(WorkFolder);
 
             AsiguraCheiaApi();
+            AsiguraProfilCanal();
             IncarcaIstoric();
 
             bool ruleazaProgramul = true;
@@ -112,26 +155,28 @@ namespace W8LegacyAutopilot
             {
                 Console.Clear();
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("=== W8 Legacy AutoPilot (V41: 100% GitHub Ready & Multi B-Roll) ===");
+                Console.WriteLine($"=== W8 Legacy AutoPilot (V45: {ProfilCurent.NumeCanal} | Hash-Bypass Activ) ===");
                 Console.ResetColor();
                 Console.WriteLine($"[INFO] Folder salvare: {WorkFolder}");
                 Console.WriteLine($"[INFO] Subiecte în istoric: {SubiecteFolosite.Count}");
                 Console.WriteLine($"[INFO] FFmpeg: {(File.Exists(FfmpegPath) ? "OK" : "LIPSEȘTE")} | yt-dlp: {(File.Exists(YtdlpPath) ? "OK" : "LIPSEȘTE")}\n");
+
                 Console.WriteLine("1. Generează UN clip clasic (Multi B-Roll + Narator)");
                 Console.WriteLine("2. Generează un LOT de clipuri clasice (Batch Mode)");
                 Console.WriteLine("3. [AUTO-RADAR GLOBAL] Caută și clonează clipuri virale");
                 Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.WriteLine("4. [STORYTELLING] Generator 'Povești din Târg / Service' (Montaj Video Variat)");
+                Console.WriteLine("4. [STORYTELLING] Generator 'Povești din Târg / Service'");
                 Console.ResetColor();
-                Console.WriteLine("5. Ieșire");
-                Console.Write("\nAlege opțiunea (1/2/3/4/5): ");
+                Console.WriteLine("5. Modifică Profilul Canalului (Nișa, Nume, Link)");
+                Console.WriteLine("6. Ieșire");
+                Console.Write("\nAlege opțiunea: ");
 
                 var optiune = Console.ReadLine()?.Trim();
 
                 switch (optiune)
                 {
                     case "1":
-                        await ProceseazaUnClip(1, 1, true);
+                        await ProceseazaUnClip(1, 1, false);
                         Console.WriteLine("\nApasă ENTER pentru a reveni la meniu...");
                         Console.ReadLine();
                         break;
@@ -149,6 +194,10 @@ namespace W8LegacyAutopilot
                         Console.ReadLine();
                         break;
                     case "5":
+                        if (File.Exists(ProfilPath)) File.Delete(ProfilPath);
+                        AsiguraProfilCanal();
+                        break;
+                    case "6":
                         ruleazaProgramul = false;
                         break;
                     default:
@@ -192,6 +241,7 @@ namespace W8LegacyAutopilot
                     string fName = Path.GetFileName(file).ToLower();
                     if (fName == "client_secrets.json" ||
                         fName == "history.json" ||
+                        fName == "profil_canal.json" ||
                         fName == "downloaded_ids.txt" ||
                         fName.StartsWith("tiktok_") ||
                         fName.StartsWith("youtube_"))
@@ -214,7 +264,7 @@ namespace W8LegacyAutopilot
             string plotIdea = "";
             while (string.IsNullOrWhiteSpace(plotIdea))
             {
-                Console.WriteLine("Despre ce să fie vorba în povestea narată? (ex: țeapă cu un Audi A4 B9, motor spart din cauza uleiului longlife, navigație blocată)");
+                Console.WriteLine("Despre ce să fie vorba în povestea narată? (ex: țeapă cu un Audi A4 B9)");
                 Console.Write("\nIdeea poveștii (sau '0' pentru preluare din Radar): ");
                 plotIdea = Console.ReadLine()?.Trim();
             }
@@ -224,7 +274,7 @@ namespace W8LegacyAutopilot
                 string q = "";
                 while (string.IsNullOrWhiteSpace(q))
                 {
-                    Console.Write("\nCe termen căutăm în Radar Auto? (ex: audi a4 b9, passat b6, mechanic fail): ");
+                    Console.Write("\nCe termen căutăm în Radar Auto? (ex: audi a4 b9, mechanic fail): ");
                     q = Console.ReadLine()?.Trim();
                 }
 
@@ -248,32 +298,29 @@ namespace W8LegacyAutopilot
             CleanupTempFiles(WorkFolder);
 
             string script = "";
-            string metaTitle = "EP1. Am cumpărat o mașină cu probleme?! #auto #masini #romania";
-            string keywords = "";
-
             bool aprobare = false;
             while (!aprobare)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("\n   -> [AI] Se scrie scenariul și se generează 12 termeni vizuali de B-Roll...");
+                Console.WriteLine("\n   -> [AI] Se scrie scenariul și metadatele unice...");
                 Console.ResetColor();
 
-                string prompt = $@"Ești un vlogger auto din România, un mecanic pasionat care spune adevărul, nu ce scrie în manualele corporatiste. Scrie o poveste super captivantă și dramatică la persoana I (ca și cum ai fi tu cel care a pățit-o).
+                string prompt = $@"Ești un vlogger auto din România care reprezintă canalul '{ProfilCurent.NumeCanal}'. Personalitatea ta este: {ProfilCurent.NisaSiPersonalitate}. Scrie o poveste super captivantă și dramatică la persoana I.
 Tema poveștii: {plotIdea}
 
-REGULI STRICTE DE LOGICĂ AUTO:
-1. EXPERT ADEVĂRAT: Nu recomanda NICIODATĂ intervale de service 'LongLife' (30.000 km). Susține mereu schimbul de ulei la 8.000 - 10.000 km. Critică politicile producătorilor auto. Combate țepele samsarilor.
-2. HOOK: Prima propoziție trebuie să socheze (ex: 'Am dat X mii de euro și am luat cea mai mare țeapă din viața mea'). Fără 'Salutare'!
-3. LUNGIME: Fix între 280 și 320 de cuvinte (aprox 70 secunde de vorbit). Numerele scrise în litere.
-4. TON ȘI JARGON: Nervos, pasionat, amuzant. Folosește expresii reale de service (ex: 'pică distribuția', 's-a făcut uleiul apă', 'crapă turbina', 'erori în bord'). Fără fraze robotice.
-5. REZOLVARE: La final, spune cum ai rezolvat problema comandând ceva de la 'magazinul NavigațiiAndroid.ro', 'Autodrop' sau 'Lacrimi de Panda' (din link-ul din profil).
+REGULI STRICTE:
+1. EXPERT ADEVĂRAT: Spune lucrurilor pe nume.
+2. HOOK: Prima propoziție trebuie să socheze. Fără 'Salutare'!
+3. LUNGIME: Fix între 280 și 320 de cuvinte.
+4. TON: Conform personalității tale. Fără fraze robotice.
 
-OBLIGATORIU: Scrie textul care va fi rostit.
-La final de tot adaugă exact aceste etichete:
+OBLIGATORIU: Scrie textul care va fi rostit de narator.
+La final adaugă exact aceste etichete (PĂSTREAZĂ EXACT DENUMIREA ETICHETELOR):
 ---KEYWORDS---
-Scrie EXACT 12 termeni de căutare YouTube în engleză, separați prin virgulă pe un singur rând, care să ilustreze vizual EXACT mașina și piesele din poveste (ex: {plotIdea} driving pov, {plotIdea} interior dashboard, {plotIdea} engine bay, mechanic scanning car obd2, dirty engine oil change, broken timing chain mechanic, car on lift inspection, turbocharger failure smoke, car dashboard warning lights, mechanic working under hood).
+Scrie EXACT 12 termeni de căutare YouTube în engleză, separați prin virgulă.
 ---META---
-Titlu scurt captivant și 4 hashtag-uri.";
+Scrie pe primul rând un Titlu senzațional și clickbait.
+De pe rândul al doilea, scrie o scurtă descriere SEO perfectă pentru algoritm. Trebuie neapărat să integrezi natural link-ul acesta: {ProfilCurent.LinkSponsor} și 4-5 hashtag-uri specifice nișei tale.";
 
                 script = await CallGeminiAndParseScript(WorkFolder, prompt, plotIdea);
 
@@ -286,12 +333,8 @@ Titlu scurt captivant și 4 hashtag-uri.";
                     continue;
                 }
 
-                if (File.Exists(Path.Combine(WorkFolder, "keywords.txt"))) keywords = File.ReadAllText(Path.Combine(WorkFolder, "keywords.txt")).Trim();
-                if (File.Exists(Path.Combine(WorkFolder, "meta.txt"))) metaTitle = File.ReadAllText(Path.Combine(WorkFolder, "meta.txt")).Trim();
-
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"\n================ POVESTE AUTO GENERATĂ ================");
-                Console.WriteLine($"[CĂUTĂRI B-ROLL SPECIFICE]: {keywords}");
                 Console.ResetColor();
                 Console.WriteLine(script);
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -309,13 +352,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
                 {
                     string txtPath = Path.Combine(WorkFolder, "script.txt");
                     File.WriteAllText(txtPath, script, new UTF8Encoding(false));
-                    using (Process p = new Process())
-                    {
-                        p.StartInfo.FileName = "notepad.exe";
-                        p.StartInfo.Arguments = $"\"{txtPath}\"";
-                        p.Start();
-                        p.WaitForExit();
-                    }
+                    using (Process p = new Process()) { p.StartInfo.FileName = "notepad.exe"; p.StartInfo.Arguments = $"\"{txtPath}\""; p.Start(); p.WaitForExit(); }
                     script = File.ReadAllText(txtPath);
                     aprobare = true;
                 }
@@ -331,28 +368,13 @@ Titlu scurt captivant și 4 hashtag-uri.";
             string finalTtPath = Path.Combine(WorkFolder, $"tiktok_story_{timestamp}.mp4");
 
             bool videoSuccess = await CoreVideoAssembly(WorkFolder, finalYtPath, finalTtPath);
-
-            if (!videoSuccess)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\n[EROARE] Asamblarea video a eșuat. Verifică conexiunea pentru yt-dlp.");
-                Console.ResetColor();
-                return;
-            }
-
-            File.Copy(finalYtPath, Path.Combine(WorkFolder, "youtube_automat.mp4"), true);
-            File.Copy(finalTtPath, Path.Combine(WorkFolder, "tiktok_automat.mp4"), true);
+            if (!videoSuccess) return;
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"\n>> [SUCCES!] Povestea a fost asamblată pe imagini variate:\n   - TikTok: {finalTtPath}\n   - YouTube: {finalYtPath}");
+            Console.WriteLine($"\n>> [SUCCES!] Povestea a fost asamblată pe imagini variate:\n   - {finalTtPath}");
             Console.ResetColor();
 
-            Console.Write("\nVrei să programez acest Video pe YouTube automat (Private)? (d/n): ");
-            string ans = Console.ReadLine()?.Trim().ToLower();
-            if (ans == "d" || ans == "da" || ans == "y")
-            {
-                await PublishVideoStepAsync(WorkFolder, finalYtPath);
-            }
+            Console.WriteLine("\n[NOTĂ ANTI-SPAM]: Deschide 'meta.txt' din folder, postează clipul MANUAL de pe telefon și pune un sunet din TikTok pe fundal la volum 1% pentru reach maxim!");
 
             CleanupTempFiles(WorkFolder);
         }
@@ -384,11 +406,10 @@ Titlu scurt captivant și 4 hashtag-uri.";
                         else
                         {
                             Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine($"   -> [EROARE API {(int)response.StatusCode}]: {responseBody}");
+                            Console.WriteLine($"   -> [EROARE API {(int)response.StatusCode}]: Probleme conexiune AI.");
                             Console.ResetColor();
                             if ((int)response.StatusCode == 400 || (int)response.StatusCode == 403)
                             {
-                                Console.WriteLine("   -> Cheia API pare invalidă. Resetează cheia:");
                                 Environment.SetEnvironmentVariable("GEMINI_API_KEY", null);
                                 Environment.SetEnvironmentVariable("GEMINI_API_KEY", null, EnvironmentVariableTarget.User);
                                 AsiguraCheiaApi();
@@ -411,12 +432,12 @@ Titlu scurt captivant și 4 hashtag-uri.";
                 string textGenerat = parsedJson.candidates[0].content.parts[0].text;
                 string scriptFinal = textGenerat;
 
-                string keywords = $"{fallbackTopic} pov drive, {fallbackTopic} interior, {fallbackTopic} engine bay, mechanic engine repair, car diagnostic obd2, car oil change service, mechanic under car lift, car dashboard warning lights, sport car acceleration pov, used car inspection";
-                string metaTitle = "Secretul pe care mecanicii nu ți-l spun! 🔥 #auto #masini #retrofit #romania";
+                string keywords = $"{fallbackTopic} pov drive, mechanic engine repair, car diagnostic obd2, used car inspection";
+                string metaTitleAndDesc = $"Secretul auto 🔥\nUrmărește canalul {ProfilCurent.NumeCanal} pentru mai multe!\n{ProfilCurent.LinkSponsor}\n#auto #masini";
 
-                if (textGenerat.Contains("---KEYWORDS---") || textGenerat.Contains("---CARNAME---"))
+                if (textGenerat.Contains("---KEYWORDS---") || textGenerat.Contains("---META---"))
                 {
-                    var parts = textGenerat.Split(new[] { "---CARNAME---", "---KEYWORDS---", "---META---" }, StringSplitOptions.None);
+                    var parts = textGenerat.Split(new[] { "---KEYWORDS---", "---META---" }, StringSplitOptions.None);
                     scriptFinal = parts[0].Trim();
 
                     var lines = textGenerat.Split('\n');
@@ -426,8 +447,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
                     foreach (var line in lines)
                     {
-                        if (line.Contains("---CARNAME---")) currentBlock = "CARNAME";
-                        else if (line.Contains("---KEYWORDS---")) currentBlock = "KEYWORDS";
+                        if (line.Contains("---KEYWORDS---")) currentBlock = "KEYWORDS";
                         else if (line.Contains("---META---")) currentBlock = "META";
                         else
                         {
@@ -440,15 +460,15 @@ Titlu scurt captivant și 4 hashtag-uri.";
                                     if (cleanKw.Length > 2) kwList.Add(cleanKw);
                                 }
                             }
-                            else if (currentBlock == "META" && !string.IsNullOrWhiteSpace(line))
+                            else if (currentBlock == "META" && !string.IsNullOrWhiteSpace(line) && !line.Contains("---"))
                             {
-                                metaBuilder += line.Trim() + " ";
+                                metaBuilder += line.Trim() + "\n";
                             }
                         }
                     }
 
                     if (kwList.Count > 0) keywords = string.Join(", ", kwList.Distinct());
-                    if (!string.IsNullOrWhiteSpace(metaBuilder)) metaTitle = metaBuilder.Trim();
+                    if (!string.IsNullOrWhiteSpace(metaBuilder)) metaTitleAndDesc = metaBuilder.Trim();
                 }
 
                 scriptFinal = scriptFinal.Replace("*", "").Replace("#", "").Trim();
@@ -456,7 +476,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
                 UTF8Encoding utf8NoBom = new UTF8Encoding(false);
                 File.WriteAllText(Path.Combine(workFolder, "script.txt"), scriptFinal, utf8NoBom);
                 File.WriteAllText(Path.Combine(workFolder, "keywords.txt"), keywords, utf8NoBom);
-                File.WriteAllText(Path.Combine(workFolder, "meta.txt"), metaTitle, utf8NoBom);
+                File.WriteAllText(Path.Combine(workFolder, "meta.txt"), metaTitleAndDesc, utf8NoBom);
 
                 return scriptFinal;
             }
@@ -465,7 +485,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
         static async Task<bool> GenerateVoiceAsync(string textToSpeak, string workFolder)
         {
-            Console.WriteLine("   -> [AUDIO] Se generează vocea...");
+            Console.WriteLine("   -> [AUDIO] Se generează vocea neurală...");
 
             string audioPath = Path.Combine(workFolder, "voce.mp3");
             string tempTextFile = Path.Combine(workFolder, "temp_text_edge.txt");
@@ -643,7 +663,6 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
             string audioPath = Path.Combine(workFolder, "voce.mp3");
             string keywordsPath = Path.Combine(workFolder, "keywords.txt");
-
             string sessionArchivePath = Path.Combine(workFolder, "session_downloaded_ids.txt");
             if (File.Exists(sessionArchivePath)) File.Delete(sessionArchivePath);
 
@@ -651,7 +670,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
             if (realAudioSeconds <= 5) realAudioSeconds = 75;
 
             double targetDuration = realAudioSeconds + 1.0;
-            Console.WriteLine($"   -> [INFO AUDIO] Vocea are {realAudioSeconds:F1} secunde. Clipul final va avea {targetDuration:F1} secunde.");
+            Console.WriteLine($"   -> [INFO AUDIO] Vocea are {realAudioSeconds:F1} secunde. Clipul final: {targetDuration:F1}s.");
 
             BuildSynchronizedSrt(workFolder, FfmpegPath, realAudioSeconds);
 
@@ -673,7 +692,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
             {
                 if (clipIndex > maxClipsToDownload) break;
 
-                Console.WriteLine($"      -> Descarc B-Roll REAL ({clipIndex}/{Math.Min(searchTerms.Count, maxClipsToDownload)}) pentru: '{searchTerm}'...");
+                Console.WriteLine($"      -> Descarc B-Roll REAL ({clipIndex}/{Math.Min(searchTerms.Count, maxClipsToDownload)}): '{searchTerm}'...");
                 string downloadedFile = await DownloadFromYouTube(YtdlpPath, FfmpegPath, searchTerm, workFolder, clipIndex, sessionArchivePath);
 
                 if (!string.IsNullOrEmpty(downloadedFile))
@@ -695,12 +714,11 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
             if (videoFiles.Count == 0) return false;
 
-            Console.WriteLine($"   -> [PASUL 1/2] S-au găsit {videoFiles.Count} surse video diferite. Se extrag segmente variate...");
+            Console.WriteLine($"   -> [PASUL 1/2] S-au găsit {videoFiles.Count} surse. Se extrag segmente variate...");
 
             double chunkLength = 3.0;
             int neededSegments = (int)Math.Ceiling((targetDuration + 3.0) / chunkLength);
             List<string> concatLines = new List<string>();
-
             int[] fileUsageCount = new int[videoFiles.Count];
 
             for (int segIdx = 0; segIdx < neededSegments; segIdx++)
@@ -735,7 +753,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
                 if (File.Exists(segFullPath) && new FileInfo(segFullPath).Length > 1000)
                 {
                     concatLines.Add($"file '{segName}'");
-                    Console.Write($"\r      -> Segment pregătit: {segIdx + 1}/{neededSegments} (din sursa #{fileIdx + 1} @ {startStr}s)   ");
+                    Console.Write($"\r      -> Segment: {segIdx + 1}/{neededSegments}   ");
                 }
             }
             Console.WriteLine();
@@ -745,13 +763,19 @@ Titlu scurt captivant și 4 hashtag-uri.";
             string concatListPath = Path.Combine(workFolder, "concat_list.txt");
             File.WriteAllLines(concatListPath, concatLines, new UTF8Encoding(false));
 
-            Console.WriteLine("   -> [PASUL 2/2] Se randează videoclipul final cu subtitrări...");
+            Console.WriteLine("   -> [PASUL 2/2] Se randează videoclipul final (cu bypass MD5)...");
 
             string targetDurStr = targetDuration.ToString("F2", CultureInfo.InvariantCulture);
 
-            string filterComplex = "[0:v]subtitles=subtitrari.srt:force_style='FontName=Impact,FontSize=24,Alignment=2,MarginV=85,PrimaryColour=&H00FFFF&,Outline=2,Bold=1'[vsub];" +
+            // FILTRU ANTI-SPAM: Modifică saturația video cu o valoare random infimă (între 1.001 și 1.015) 
+            // pentru a genera un hash MD5 absolut unic la fiecare clip. Nu mai pici filtrul de conținut duplicat!
+            double randomSaturation = 1.0 + (new Random().Next(1, 15) / 1000.0);
+            string satStr = randomSaturation.ToString(CultureInfo.InvariantCulture);
+
+            string filterComplex = $"[0:v]eq=saturation={satStr}[v_unique];" +
+                                   $"[v_unique]subtitles=subtitrari.srt:force_style='FontName=Impact,FontSize=24,Alignment=2,MarginV=85,PrimaryColour=&H00FFFF&,Outline=2,Bold=1'[vsub];" +
                                    "[vsub]split=2[v1][v2];" +
-                                   "[v1]drawtext=fontfile='C\\:/Windows/Fonts/impact.ttf':text='YouTube - @W8LegacyOfficial':fontcolor=white@0.5:fontsize=40:x=40:y=80[v_yt];" +
+                                   $"[v1]drawtext=fontfile='C\\:/Windows/Fonts/impact.ttf':text='YouTube - @{ProfilCurent.NumeCanal}':fontcolor=white@0.5:fontsize=40:x=40:y=80[v_yt];" +
                                    "[v2]null[v_tt];" +
                                    "[1:a]apad=pad_dur=1.0[a_pad];" +
                                    "[a_pad]asplit=2[a_yt][a_tt]";
@@ -779,7 +803,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
                     {
                         if (!string.IsNullOrEmpty(e.Data) && e.Data.Contains("frame="))
                         {
-                            Console.Write($"\r      -> [RANDARE FINALĂ] {e.Data.PadRight(75)}");
+                            Console.Write($"\r      -> [RANDARE] {e.Data.PadRight(75)}");
                         }
                     };
 
@@ -904,10 +928,10 @@ Titlu scurt captivant și 4 hashtag-uri.";
                 File.Copy(finalTtPath, Path.Combine(WorkFolder, "tiktok_automat.mp4"), true);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"\n>> [SALVAT PE PC] Videoclipurile au fost salvate în:\n   - {finalTtPath}\n   - {finalYtPath}");
+                Console.WriteLine($"\n>> [SALVAT PE PC] Videoclipurile au hash MD5 unic (Anti-Spam activat). Caută-le în:\n   - {finalTtPath}\n   - {finalYtPath}");
                 Console.ResetColor();
 
-                if (uploadToYouTube) await PublishVideoStepAsync(WorkFolder, finalYtPath);
+                Console.WriteLine("\n[NOTĂ ANTI-SPAM]: Deschide 'meta.txt' din folder, postează clipul MANUAL de pe telefon și pune un sunet din TikTok pe fundal la volum 1% pentru reach maxim!");
             }
             catch { }
             finally { CleanupTempFiles(WorkFolder); }
@@ -915,32 +939,29 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
         static async Task<string> GenerateScriptAsync(string workFolder, string customTopic)
         {
-            Console.WriteLine($"   -> [AI] Se scrie scenariul...");
-            string[] sponsorNames = { "NavigațiiAndroid.ro", "magazinul Autodrop", "magazinul Lacrimi de Panda" };
-            string sponsorulZilei = sponsorNames[new Random(Guid.NewGuid().GetHashCode()).Next(sponsorNames.Length)];
+            Console.WriteLine($"   -> [AI] Se scrie scenariul și metadatele unice...");
             string[] unghiuriAbordare = {
-                "Începe direct cu un model concret de mașină și o greșeală tehnică pe care o fac mulți șoferi.",
-                "Vorbește din perspectiva unui pasionat care a testat zeci de variante și explică diferența reală dintre ceva ieftin și ceva de calitate.",
+                "Începe direct cu o greșeală tehnică pe care o fac mulți șoferi.",
+                "Vorbește din perspectiva unui pasionat care a testat zeci de variante.",
                 "Începe cu o afirmație controversată care împarte șoferii în două tabere."
             };
             string unghiAles = unghiuriAbordare[new Random(Guid.NewGuid().GetHashCode()).Next(unghiuriAbordare.Length)];
 
-            string prompt = $@"Ești un vlogger auto român pasionat, genul de mecanic real care spune adevărul verde-n față, nu ce scrie în manualele corporatiste. Scrie un scenariu dramatic și captivant pentru TikTok/Shorts despre: '{customTopic}'.
+            string prompt = $@"Ești creatorul de conținut auto din spatele canalului '{ProfilCurent.NumeCanal}'. Personalitatea contului este: {ProfilCurent.NisaSiPersonalitate}. Scrie un scenariu pentru TikTok/Shorts despre: '{customTopic}'.
 
-REGULI STRICTE DE LOGICĂ AUTO:
-1. EXPERT ADEVĂRAT: Nu recomanda NICIODATĂ intervale de service 'LongLife' (30.000 km). Susține mereu schimbul de ulei la 8.000 - 10.000 km. Critică politicile producătorilor auto care fac mașini de unică folosință și piese de plastic. Combate țepele samsarilor.
-2. UNGHI DE ABORDARE: {unghiAles}
-3. FĂRĂ CLIȘEE: Intră direct în subiect din prima secundă (ex: 'Dacă faci greșeala asta...'). Fără 'Salutare, prieteni'.
-4. LUNGIME: Între 260 și 300 de cuvinte. Cifrele scrise în litere.
-5. JARGON ROMÂNESC: Folosește expresii reale de service (ex: 'îi pică distribuția', 'crapă turbina', 's-a făcut uleiul apă', 'faci motorul praf'). Fără fraze robotice.
-6. CALL TO ACTION: La final, adresează o întrebare scurtă publicului și recomandă {sponsorulZilei} (link în Bio).
+REGULI STRICTE:
+1. UNGHI DE ABORDARE: {unghiAles}
+2. FĂRĂ CLIȘEE: Intră direct în subiect din prima secundă. Fără 'Salutare, prieteni'.
+3. LUNGIME: Între 260 și 300 de cuvinte. Cifrele scrise în litere.
+4. JARGON ROMÂNESC: Folosește expresii reale de service. Fără fraze robotice.
 
-OBLIGATORIU: Scrie mai întâi TOT SCRIPTUL ROSTIT. 
-La final de tot adaugă exact aceste etichete:
+OBLIGATORIU: Scrie mai întâi TOT SCRIPTUL ROSTIT de narator. 
+La final adaugă exact aceste etichete:
 ---KEYWORDS---
-Scrie EXACT 12 termeni scurți în engleză, separați prin virgulă pe un singur rând, care să ilustreze vizual subiectul '{customTopic}' (ex: {customTopic} pov, {customTopic} engine bay, {customTopic} interior, mechanic engine repair, car diagnostic obd2, dirty engine oil, broken car part mechanic, car on lift service, dashboard warning lights, turbocharger repair).
+Scrie EXACT 12 termeni scurți în engleză, separați prin virgulă pentru B-roll video.
 ---META---
-Titlu scurt captivant și 4 hashtag-uri.";
+Scrie pe primul rând un Titlu senzațional și clickbait.
+De pe rândul al doilea, scrie o descriere SEO completă (minim 3-4 rânduri) care să sune natural pentru '{ProfilCurent.NumeCanal}'. Trebuie neapărat să integrezi acest link: {ProfilCurent.LinkSponsor} și 5 hashtag-uri.";
 
             return await CallGeminiAndParseScript(workFolder, prompt, customTopic);
         }
@@ -1000,6 +1021,7 @@ Titlu scurt captivant și 4 hashtag-uri.";
             string finalTtPath = Path.Combine(WorkFolder, $"tiktok_radar_{timestamp}.mp4");
 
             await CoreVideoAssembly(WorkFolder, finalYtPath, finalTtPath);
+            Console.WriteLine("\n[NOTĂ ANTI-SPAM]: Deschide 'meta.txt', copiază descrierea și postează MANUAL de pe telefon cu un sunet TikTok la volum 1%!");
         }
 
         static async Task<List<ViralVideoInfo>> SearchTopViralVideos(string query)
@@ -1042,94 +1064,26 @@ Titlu scurt captivant și 4 hashtag-uri.";
 
         static async Task<string> GenerateClonedScriptAsync(string workFolder, string originalTitle, string originalTranscript, string searchTerm)
         {
-            string[] sponsorNames = { "NavigațiiAndroid.ro", "magazinul Autodrop", "magazinul Lacrimi de Panda" };
-            string sponsorulZilei = sponsorNames[new Random(Guid.NewGuid().GetHashCode()).Next(sponsorNames.Length)];
-
-            string prompt = $@"Ești un creator de conținut auto de top din România și un mecanic adevărat. Iată un clip viral detectat de radar:
+            string prompt = $@"Ești canalul '{ProfilCurent.NumeCanal}' ({ProfilCurent.NisaSiPersonalitate}). Iată un clip viral detectat de radar:
 TITLU ORIGINAL: '{originalTitle}'
 CONȚINUT: '{originalTranscript}'
 
-Creează un scenariu în limba română pentru @W8LegacyOfficial care păstrează structura captivantă, dar reformulat natural, 100% original.
+Creează un scenariu în limba română care păstrează structura captivantă, dar reformulat natural.
 
 REGULI STRICTE:
-1. LOGICĂ AUTO REALĂ: Dacă textul original recomandă prostii (gen ulei la 30.000 km), CORECTEAZĂ-L! Susține schimbul la 8.000 - 10.000 km. Fii de partea mecanicilor reali.
-2. HOOK: Prima propoziție trebuie să oprească utilizatorul din scroll instant (fără salutări).
-3. LUNGIME (65-75 secunde): Între 260 și 300 de cuvinte. Cifrele scrise în litere.
-4. JARGON: Fără engleză. Folosește termeni reali ('pică turbina', 'rețeaua mașinii').
-5. CALL TO ACTION: La final, întreabă ceva de comentarii și recomandă natural {sponsorulZilei} (link în Bio).
+1. HOOK: Prima propoziție trebuie să oprească utilizatorul din scroll instant.
+2. LUNGIME (65-75 secunde): Între 260 și 300 de cuvinte. Cifrele scrise în litere.
+3. JARGON: Fără engleză. Folosește termeni reali.
 
 OBLIGATORIU: Scrie mai întâi TOT SCRIPTUL ROSTIT. 
-La final de tot adaugă exact aceste etichete:
+La final adaugă exact aceste etichete (PĂSTREAZĂ EXACT DENUMIREA ETICHETELOR):
 ---KEYWORDS---
-Scrie EXACT 12 termeni în engleză separați prin virgulă pe un singur rând pentru B-roll video (ex: {searchTerm} pov drive, {searchTerm} engine bay, broken car engine mechanic, car diagnostic obd2, oil change service, mechanic angry, car on lift).
+Scrie EXACT 12 termeni în engleză separați prin virgulă pentru B-roll video.
 ---META---
-Titlu și 4 hashtag-uri.";
+Scrie pe primul rând un Titlu senzațional și clickbait.
+De pe rândul al doilea, scrie o scurtă descriere SEO perfectă. Trebuie neapărat să integrezi natural link-ul acesta: {ProfilCurent.LinkSponsor} și 4-5 hashtag-uri.";
 
             return await CallGeminiAndParseScript(workFolder, prompt, searchTerm);
-        }
-
-        static async Task PublishVideoStepAsync(string workFolder, string specificVideoPath)
-        {
-            string metaPath = Path.Combine(workFolder, "meta.txt");
-            if (!File.Exists(specificVideoPath)) return;
-            string baseTitle = File.Exists(metaPath) ? File.ReadAllText(metaPath).Split('#')[0].Trim() : "Secretul auto! 🔥";
-            string ytDesc = baseTitle + "\n\n🔗 Link în bio!\n#Shorts #Auto #Romania";
-            await UploadToYouTubeAsync(workFolder, specificVideoPath, baseTitle, ytDesc);
-        }
-
-        static async Task UploadToYouTubeAsync(string workFolder, string videoPath, string title, string description)
-        {
-            string secretsPath = Path.Combine(workFolder, "client_secrets.json");
-
-            if (!File.Exists(secretsPath))
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"\n[INFO YOUTUBE] Fișierul 'client_secrets.json' nu a fost găsit în: {workFolder}");
-                Console.WriteLine("-> Pentru upload automat, descarcă propriul tău OAuth JSON din Google Cloud Console,");
-                Console.WriteLine("   redenumește-l în 'client_secrets.json' și pune-l în folderul de pe Desktop.");
-                Console.ResetColor();
-                return;
-            }
-
-            try
-            {
-                UserCredential credential;
-                using (var stream = new FileStream(secretsPath, FileMode.Open, FileAccess.Read))
-                {
-                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        GoogleClientSecrets.FromStream(stream).Secrets, new[] { YouTubeService.Scope.YoutubeUpload },
-                        "w8_user", CancellationToken.None, new Google.Apis.Util.Store.FileDataStore(Path.Combine(workFolder, "YouTube_Auth_Token"), true));
-                }
-                var youtubeService = new YouTubeService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "W8Legacy" });
-
-                var video = new Video
-                {
-                    Snippet = new VideoSnippet
-                    {
-                        Title = title,
-                        Description = description,
-                        CategoryId = "2"
-                    },
-                    Status = new VideoStatus
-                    {
-                        PrivacyStatus = "private",
-                        PublishAtDateTimeOffset = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Date.AddHours(18))
-                    }
-                };
-
-                using (var fileStream = new FileStream(videoPath, FileMode.Open, FileAccess.Read))
-                {
-                    var vRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
-                    vRequest.ResponseReceived += v => Console.WriteLine($"[YOUTUBE] Programat cu succes! ID: {v.Id}");
-                    await vRequest.UploadAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[EROARE UPLOAD YOUTUBE]: {ex.Message}");
-                Console.ResetColor();
-            }
         }
     }
 }
